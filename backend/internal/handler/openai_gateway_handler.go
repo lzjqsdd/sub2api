@@ -1019,6 +1019,10 @@ func (h *OpenAIGatewayHandler) normalizeOpenAIResponsesCompactRequest(c *gin.Con
 			body = normalized
 		}
 		if isOpenAIRemoteCompactionV2Request(body) {
+			// Mark before StartOpenAICompactSSEKeepalive runs. Native streaming
+			// upstreams suspend the heartbeat when their response starts, while
+			// unary compatibility bridges keep it alive until the final result.
+			service.MarkOpenAICompactClientStream(c)
 			return body, true
 		}
 		c.Request.URL.Path = strings.TrimRight(c.Request.URL.Path, "/") + "/compact"
