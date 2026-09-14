@@ -900,6 +900,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 	// 账号级请求头覆写：测试请求与真实转发保持一致的最终头
 	credentialAccount.ApplyHeaderOverrides(req.Header)
+	// OpenCode 上游（含以 openai 平台 + opencode.ai base_url 注册的账号）要求
+	// x-opencode-session；测试路径必须与网关转发保持一致，否则连接测试报 MissingSessionID。
+	applyOpenCodeSessionHeader(c, credentialAccount, apiURL, req.Header, payloadBytes)
 
 	// Get proxy URL
 	proxyURL := ""
