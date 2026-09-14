@@ -1,0 +1,71 @@
+name: Build linux amd64 binary (embed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string for the binary and tarball'
+        required: false
+        default: '0.1.172'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm run build
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Build binary
+        working-directory: backend
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          CGO_ENABLED=0 go build -tags=embed -trimpath \
+            -ldflags="-s -w -X main.Version=$VERSION" \
+            -o sub2api ./cmd/server
+
+      - name: Package tarball
+        run: |
+          mkdir -p dist
+          cp backend/sub2api dist/sub2api
+          tar -czf "dist/sub2api_${VERSION}_linux_amd64.tar.gz" -C dist sub2api
+          ls -lh dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sub2api-linux-amd64
+          path: |
+            backend/sub2api
+            dist/sub2api_${VERSION}_linux_amd64.tar.gz
+          retention-days: 7
